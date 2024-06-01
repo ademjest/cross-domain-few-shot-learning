@@ -1,1 +1,2 @@
-
+数据集使用自己的数据集，需要将每个域划分为train、val、test
+划分代码见data_split.py
