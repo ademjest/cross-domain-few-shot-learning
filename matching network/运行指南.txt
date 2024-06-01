@@ -1,0 +1,4 @@
+这个代码实际上是集大成的，包含maml,matching network,protonets三个网络，但是我现在只用来跑了matching network。
+要训练的话先运行prepare_officehome.py来处理自己officehome数据集，记得修改其中的source_path为原始officehome数据集存放的位置。
+训练的话运行matching_nets.py即可。
+其他功能如测试数据还未测试过。
