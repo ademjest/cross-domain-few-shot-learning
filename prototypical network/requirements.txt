@@ -1,0 +1,5 @@
+tensorboard
+chardet
+Pillow
+tqdm
+pyyaml
