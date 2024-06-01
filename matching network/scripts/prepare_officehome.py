@@ -52,7 +52,7 @@ for c in evaluation_classes:
 print("已创建新的训练和测试文件夹")
 
 # 移动图像到对应文件夹
-for domain in ['art', 'clipart']:
+for domain in ['Art', 'Clipart']:
     domain_path = os.path.join(source_path, domain)
     for class_name in os.listdir(domain_path):
         class_dir = os.path.join(domain_path, class_name)
