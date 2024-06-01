@@ -1,3 +1,4 @@
-数据集已经划分好放在data/officehome里，想要训练的话运行以下指令：
+如果要加入其他数据集，可以运行src/data/data_process.py将数据集划分为train,val,test以符合meta_train.py训练要求。
+officehome的训练数据集（包括art,clipart类型）已经划分好放在data/officehome里，想要训练的话运行以下指令：
 python meta_train.py --data datasets/officehome --episodes 200 --device cuda --num-way 30 --query 15 --shot 5 --val-num-way 5 --iterations 100 --adam-lr 0.001 --adam-step 20 --adam-gamma 0.5 --metric "euclidean" --save-period 5 --patience 10 --patience-delta 0.01
-其他具体指令可以参考这个文件夹里的readme.md
+其他具体指令可以参考这个文件夹里的readme.md。
