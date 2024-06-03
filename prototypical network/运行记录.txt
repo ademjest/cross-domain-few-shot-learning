@@ -1,5 +1,5 @@
 在训练我们的officehome时容易早停，即连续多个epochs损失没有下降，9个、10个、12个epoch就停了，验证准确率只有0.33，但是训练完的权重用来测试时，测试准确率只有0.2
-我个人感觉是数据量太少了，最少的"Ruler"类别图片只有15张，以下是具体情况：
+我个人感觉是数据量太少了，最少的"Ruler"类别图片只有15张，以下是具体情况（每个域都只有65类，类别是相同的）：
 Art-----
 Category: Alarm_Clock, Number of images: 74
 Category: Backpack, Number of images: 41
