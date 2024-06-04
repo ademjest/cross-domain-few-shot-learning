@@ -1,0 +1,1 @@
+暂时只改好了“训练GAN生成网络和判别网络.py”，需要修改route为自己存放officehome/train的地址，要先划分数据集为train,val,test
