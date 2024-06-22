@@ -3,7 +3,7 @@ import os
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
-
+import matplotlib.pyplot as plt
 import numpy as np
 import yaml
 from tqdm import tqdm
@@ -29,22 +29,46 @@ print(f"***** Few-shot Learning with proto nets. v{__version__} *****")
 
 
 def build_dataloaders_test(dataset='mini_imagenet', size=None, channels=None):
-    if dataset == 'mini_imagenet':
-        test_loader = MiniImagenetDataset(mode='test', load_on_ram=True, download=True, images_size=size, tmp_dir="datasets")
-        return test_loader
-    elif dataset == 'omniglot':
-        test_loader = OmniglotDataset(mode='test', load_on_ram=True, download=True, images_size=size, tmp_dir="datasets")
-        return test_loader
-    elif dataset == 'flowers102':
-        test_loader = Flowers102Dataset(mode='test', load_on_ram=True, download=True, images_size=size, tmp_dir="datasets")
-        return test_loader
-    elif os.path.exists(dataset):
-        test_loader = CustomDataset(mode='test', load_on_ram=True, images_size=size, image_ch=channels, dataset_path=dataset)
-        return test_loader
-    elif dataset == 'stanford_cars':
-        test_loader = StanfordCarsDataset(mode='test', load_on_ram=True, download=True, images_size=size, tmp_dir="datasets")
-        return test_loader
-    raise Exception("dataset unknown")
+    # if dataset == 'mini_imagenet':
+    #     test_loader = MiniImagenetDataset(mode='test', load_on_ram=True, download=True, images_size=size, tmp_dir="datasets")
+    #     return test_loader
+    # elif dataset == 'omniglot':
+    #     test_loader = OmniglotDataset(mode='test', load_on_ram=True, download=True, images_size=size, tmp_dir="datasets")
+    #     return test_loader
+    # elif dataset == 'flowers102':
+    #     test_loader = Flowers102Dataset(mode='test', load_on_ram=True, download=True, images_size=size, tmp_dir="datasets")
+    #     return test_loader
+    # elif os.path.exists(dataset):
+    #     test_loader = CustomDataset(mode='test', load_on_ram=True, images_size=size, image_ch=channels, dataset_path=dataset)
+    #     return test_loader
+    # elif dataset == 'stanford_cars':
+    #     test_loader = StanfordCarsDataset(mode='test', load_on_ram=True, download=True, images_size=size, tmp_dir="datasets")
+    #     return test_loader
+    # raise Exception("dataset unknown")
+    if os.path.exists(dataset):
+        if dataset == 'mini_imagenet':
+            test_loader = MiniImagenetDataset(mode='test', load_on_ram=True, download=False, images_size=size,
+                                              tmp_dir="datasets")
+            return test_loader
+        elif dataset == 'omniglot':
+            test_loader = OmniglotDataset(mode='test', load_on_ram=True, download=False, images_size=size,
+                                          tmp_dir="datasets")
+            return test_loader
+        elif dataset == 'flowers102':
+            test_loader = Flowers102Dataset(mode='test', load_on_ram=True, download=False, images_size=size,
+                                            tmp_dir="datasets")
+            return test_loader
+        elif dataset == 'stanford_cars':
+            test_loader = StanfordCarsDataset(mode='test', load_on_ram=True, download=False, images_size=size,
+                                              tmp_dir="datasets")
+            return test_loader
+        else:
+            # 假设是自定义数据集路径
+            test_loader = CustomDataset(mode='test', load_on_ram=True, images_size=size, image_ch=channels,
+                                        dataset_path=dataset)
+            return test_loader
+    print(dataset)
+    raise Exception("Dataset unknown or path does not exist")
 
 
 def build_dataloaders(dataset='mini_imagenet', size=None, channels=None):
@@ -141,7 +165,7 @@ def meta_train(cfg: dict) -> str:
     best_acc_ep = -1
     start_time = datetime.datetime.now()
 
-    print(f"Startring training at {str(start_time)}")
+    print(f"Starting training at {str(start_time)}")
     NC, NS, NQ = cfg['num_way'], cfg['shot'], cfg['query']
     for epoch in range(cfg['episodes'] + 1):
         model.train()
@@ -199,16 +223,20 @@ def evaluate(cfg, model, data_loader, device, distance_fn):
     with torch.no_grad():
         for i in tqdm(range(cfg['iterations']), total=cfg['iterations']):
             batch = data_loader.GetSample(NC, NS, NQ)
-            x, y = batch
+            x, y = batch  # 从test数据集中提取数据图像x和对应类别y
+            if y.size(0) < (cfg["n_support"] + NC):
+                print(f"Skipping batch {i} due to insufficient samples")
+                continue
             x = x.to(device)
             y = y.to(device)
-            x = model(x)
-            loss, acc = prototypical_loss(x, y, NS, NC, distance_fn)
+            output = model(x)
+            loss, acc = prototypical_loss(output, y, NS, NC, distance_fn)
             losses.append(loss.item())
             accs.append(acc.item())
         avg_loss = np.mean(losses)
         avg_acc = np.mean(accs)
     return avg_loss, avg_acc
+
 
 def meta_test(cfg) -> float:
     print("Building DataLoaders")
@@ -236,14 +264,17 @@ def learn(cfg):
 
     model.eval()
     with torch.no_grad():
-        classes = list(os.listdir(cfg['data']))
+        path = os.path.join(cfg['data'], 'test')
+        classes = list(os.listdir(path))
+        print(f"classes={classes}")
         for cl in tqdm(classes, total=len(classes)):
-            class_samples = load_class_images(os.path.join(cfg['data'], cl), (cfg['imgsz'], cfg['imgsz']), cfg['channels'])
+            class_samples = load_class_images(os.path.join(path, cl), (cfg['imgsz'], cfg['imgsz']), cfg['channels'], cfg['mode'])
             class_samples = class_samples.to(device)
             embeddings = model(class_samples)
             centroids = embeddings.mean(dim=0)
             save_centroids(os.path.join(out_dir, cl), centroids.to('cpu'))
     print(f"Deployed to {out_dir}")
+
 
 def predict(cfg) -> list:
     device = get_torch_device(cfg["device"])
@@ -253,10 +284,11 @@ def predict(cfg) -> list:
 
     print("Loading data")
     prototypes, classes = load_centroids(cfg['centroids'])
+    print(classes)
     size = (cfg['imgsz'], cfg['imgsz'])
     batch_size = 4  # set to speed up
     images_path = [cfg['data']] if os.path.isfile(cfg['data']) else [os.path.join(cfg['data'], f) for f in sorted(os.listdir(cfg['data']))]
-
+    print(images_path)
     model.eval()
     results = []
     with torch.no_grad():
@@ -268,7 +300,7 @@ def predict(cfg) -> list:
             for j in range(batch_size):
                 if i+j >= len(images_path): break
                 images.append(images_path[i + j])
-                batch.append(load_image(images_path[i + j], size).float())
+                batch.append(load_image(cfg['mode'],images_path[i + j], size).float())
             i += len(batch)
             if len(batch) == 0: break
             sample = torch.stack(batch)
